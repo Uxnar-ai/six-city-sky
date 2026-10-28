@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>天光 · 六城天气</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#0c1014; --panel:#141a20; --line:#1f272f; --fg:#e8eef4;
+    --dim:#8494a3; --accent:#5ec8d8;
+    --good:#3fb950; --fair:#9acd32; --mid:#d29922; --poor:#f0883e; --bad:#f85149;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .wrap{max-width:1000px;margin:0 auto;padding:30px 20px 60px}
+  header{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;
+         border-bottom:1px solid var(--line);padding-bottom:14px}
+  h1{font-size:20px;margin:0;letter-spacing:.5px}
+  h1 .en{color:var(--dim);font-weight:400}
+  .meta{margin-left:auto;color:var(--dim);font-size:12px}
+  .sub{color:var(--dim);font-size:12px;margin:10px 0 24px}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .city{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px}
+  .row1{display:flex;align-items:baseline;gap:10px}
+  .cname{font-size:15px;font-weight:600}
+  .desc{color:var(--dim);font-size:12px}
+  .aqi{margin-left:auto;font-size:11px;padding:2px 8px;border-radius:20px;
+       border:1px solid currentColor}
+  .aqi.good{color:var(--good)} .aqi.fair{color:var(--fair)}
+  .aqi.mid{color:var(--mid)} .aqi.poor{color:var(--poor)}
+  .aqi.bad{color:var(--bad)} .aqi.na{color:var(--dim)}
+  .temp{font-size:34px;font-weight:600;margin:8px 0 2px;font-variant-numeric:tabular-nums}
+  .temp .u{font-size:14px;color:var(--dim);font-weight:400;margin-left:2px}
+  .kv{display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--dim);font-size:11.5px;margin-top:6px}
+  .kv b{color:var(--fg);font-weight:500}
+  .week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:14px;
+        border-top:1px solid var(--line);padding-top:12px}
+  .day{text-align:center;font-size:10.5px;color:var(--dim)}
+  .day .d{color:var(--fg);opacity:.75}
+  .day .t{color:var(--fg);font-size:11px;margin-top:2px}
+  .day .lo{color:var(--dim)}
+  .bar{height:4px;border-radius:2px;background:var(--accent);opacity:.7;margin:4px 2px}
+  footer{margin-top:26px;color:var(--dim);font-size:11px;
+         border-top:1px solid var(--line);padding-top:12px;line-height:1.9}
+  .err{background:#2a1618;border:1px solid var(--bad);color:#ffb3ae;
+       padding:12px 14px;border-radius:8px;font-size:12px;margin-bottom:18px}
+  @media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>天光 <span class="en">sky</span></h1>
+    <span class="meta">数据 {{ stamp }} · 每 {{ refresh }} 分钟刷新</span>
+  </header>
+  <p class="sub">六座城市，此刻天气 + 未来七天。数据来自 Open-Meteo 公开接口，
+     一次请求取全部城市，两个接口合计每轮 2 个请求。</p>
+
+  {% if st.error %}
+  <div class="err">本轮刷新失败：{{ st.error }}（页面继续显示上一次成功的数据）</div>
+  {% endif %}
+
+  <div class="grid">
+    {% for c in st.cities %}
+    {% set cur = c.current %}
+    {% set air = c.air %}
+    <div class="city">
+      <div class="row1">
+        <span class="cname">{{ c.name }}</span>
+        <span class="desc">{{ cur.desc }}</span>
+        <span class="aqi {{ c.aqi_lv.cls }}">空气 {{ c.aqi_lv.label }}{% if air.us_aqi is not none %} {{ air.us_aqi|round(0)|int }}{% endif %}</span>
+      </div>
+      <div class="temp">{{ cur.temperature_2m|round(1) if cur.temperature_2m is not none else '—' }}<span class="u">°C</span></div>
+      <div class="kv">
+        <span>体感 <b>{{ cur.apparent_temperature|round(1) if cur.apparent_temperature is not none else '—' }}°</b></span>
+        <span>湿度 <b>{{ cur.relative_humidity_2m|round(0)|int if cur.relative_humidity_2m is not none else '—' }}%</b></span>
+        <span>风 <b>{{ cur.wind_speed_10m|round(1) if cur.wind_speed_10m is not none else '—' }} km/h</b></span>
+        <span>PM2.5 <b>{{ air.pm2_5|round(1) if air.pm2_5 is not none else '—' }}</b></span>
+      </div>
+      <div class="week">
+        {% for d in c.daily %}
+        <div class="day">
+          <div class="d">{{ d.day[5:] }}</div>
+          <div class="t">{{ d.tmax|round(0)|int if d.tmax is not none else '—' }}°</div>
+          <div class="lo">{{ d.tmin|round(0)|int if d.tmin is not none else '—' }}°</div>
+          <div class="bar" style="width:{{ 20 + (d.pprob or 0) * 0.8 }}%;margin-left:auto;margin-right:auto"></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="city">正在取第一轮数据…</div>
+    {% endfor %}
+  </div>
+
+  <footer>
+    日出日落（今天，{{ st.cities[0].name if st.cities else '—' }}）：
+    {% if st.cities and st.cities[0].daily %}
+      {{ st.cities[0].daily[0].sunrise }} / {{ st.cities[0].daily[0].sunset }}
+    {% else %}—{% endif %}<br>
+    底部细条长度 = 当天降水概率（0–100%）。原始数据落 SQLite，保留 7 天采样。
+  </footer>
+</div>
+</body>
+</html>
